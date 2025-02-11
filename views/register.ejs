@@ -1,20 +1,22 @@
 <%- include("partials/head.ejs") %>
 <%- include("partials/header.ejs") %>
 <form method="POST">
+  <input type="hidden" name="_csrf" value="<%= _csrf %>" /> <!-- CSRF Token -->
+
   <div>
-    <label name="name">Enter your name:</label>
+    <label for="name">Enter your name:</label>
     <input name="name" />
   </div>
   <div>
-    <label name="email">Enter your email:</label>
+    <label for="email">Enter your email:</label>
     <input name="email" />
   </div>
   <div>
-    <label name="password">Enter your password:</label>
+    <label for="password">Enter your password:</label>
     <input type="password" name="password" />
   </div>
   <div>
-    <label name="password1">Confirm your password:</label>
+    <label for="password1">Confirm your password:</label>
     <input type="password" name="password1" />
   </div>
   <div>
