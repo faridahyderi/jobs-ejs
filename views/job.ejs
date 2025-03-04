@@ -1,0 +1,26 @@
+<h2><%= job ? 'Edit Job' : 'Add New Job' %></h2>
+<form method="POST" action="<%= job ? '/jobs/update/' + job._id : '/jobs' %>">
+  <div>
+    <label for="company">Company</label>
+    <input type="text" name="company" value="<%= job ? job.company : '' %>" required />
+  </div>
+  <div>
+    <label for="position">Position</label>
+    <input type="text" name="position" value="<%= job ? job.position : '' %>" required />
+  </div>
+  <div>
+    <label for="status">Status</label>
+    <input type="text" name="status" value="<%= job ? job.status : '' %>" required />
+  </div>
+  <!-- Include the CSRF token here -->
+  <input type="hidden" name="_csrf" value="<%= _csrf %>" />
+  <button type="submit"><%= job ? 'Update' : 'Create' %> Job</button>
+</form>
+<% if (errors && errors.length) { %>
+  <ul>
+    <% errors.forEach((error) => { %>
+      <li><%= error %></li>
+    <% }) %>
+  </ul>
+<% } %>
+<a href="/jobs">Back to Jobs</a>

@@ -1,19 +1,34 @@
 const express = require("express");
+const Job = require("./models/Job");
 require("express-async-errors");
-
 const app = express();
+
+//  Middleware to set Content-Type headers based on the route
+app.use((req, res, next) => {
+  if (req.path == "/multiply") {
+    res.set("Content-Type", "application/json");
+  } else {
+    res.set("Content-Type", "text/html");
+  }
+  next();
+});
 
 app.set("view engine", "ejs");
 app.use(require("body-parser").urlencoded({ extended: true }));
 
-require("dotenv").config(); // to load the .env file into the process.env object
-const session = require("express-session");
+require("dotenv").config();
+const session = require("express-session");   
 const MongoDBStore = require("connect-mongodb-session")(session);
-const url = process.env.MONGO_URI;
+const csurf = require("csurf"); // CSRF protection
+const cookieParser = require("cookie-parser"); // Required for CSRF middleware
+
+let mongoURL = process.env.MONGO_URI;
+if (process.env.NODE_ENV === "test") {
+  mongoURL = process.env.MONGO_URI_TEST;
+}
 
 const store = new MongoDBStore({
-  // may throw an error, which won't be caught
-  uri: url,
+  uri: mongoURL,
   collection: "mySessions",
 });
 store.on("error", function (error) {
@@ -29,36 +44,71 @@ const sessionParms = {
 };
 
 if (app.get("env") === "production") {
-  app.set("trust proxy", 1); // trust first proxy
-  sessionParms.cookie.secure = true; // serve secure cookies
+  app.set("trust proxy", 1);
+  sessionParms.cookie.secure = true;
 }
 
+app.use(cookieParser()); // Must be before CSRF middleware
 app.use(session(sessionParms));
 
+const passport = require("passport");
+const passportInit = require("./passport/passportInit");
+passportInit();
+app.use(passport.initialize());
+app.use(passport.session());
+
 app.use(require("connect-flash")());
+app.use(require("./middleware/storeLocals"));
 
-// secret word handling
-// let secretWord = "syzygy"; <-- comment this out or remove this line
-app.get("/secretWord", (req, res) => {
-    if (!req.session.secretWord) {
-      req.session.secretWord = "syzygy";
-    }
-    res.locals.info = req.flash("info");
-    res.locals.errors = req.flash("error");
-    res.render("secretWord", { secretWord: req.session.secretWord });
-  });
+//  CSRF Protection Middleware (Must be after session and body-parser)
+app.use(csurf({ cookie: true }));
 
-  app.post("/secretWord", (req, res) => {
-    if (req.body.secretWord.toUpperCase()[0] == "P") {
-      req.flash("error", "That word won't work!");
-      req.flash("error", "You can't use words that start with p.");
-    } else {
-      req.session.secretWord = req.body.secretWord;
-      req.flash("info", "The secret word was changed.");
-    }
-    res.redirect("/secretWord");
-  });
 
+//  Middleware to pass CSRF token to views
+app.use((req, res, next) => {
+  res.locals._csrf = req.csrfToken();  // Make sure CSRF token is available in views
+  next();
+});
+
+// Jobs - Add New Job Page
+app.get("/jobs/new", (req, res) => {
+  res.render("job", { job: null, _csrf: req.csrfToken() }); // Explicitly pass job as null
+});
+
+app.get("/jobs/:id/edit", async (req, res) => {
+  const job = await Job.findById(req.params.id);  // Find the job by ID
+  if (!job) {
+    return res.status(404).send("Job not found");  // Handle case when job is not found
+  }
+  res.render("job", { job, _csrf: req.csrfToken() });  // Pass job object for editing
+});
+
+app.get("/", (req, res) => {
+  res.render("index");
+});
+
+//  Job Routes
+const auth = require("./middleware/auth");
+const jobRouter = require("./routes/jobs");  // Import job routes
+app.use("/jobs", auth, jobRouter);  // Add job routes to the app and ensure auth middleware is applied
+
+// Multiply API - Add before the 404 handler
+app.get("/multiply", (req, res) => {
+  let result = req.query.first * req.query.second;
+  if (isNaN(result)) {
+    result = "NaN";
+  } else if (result == null) {
+    result = "null";
+  }
+  res.json({ result: result });
+});
+
+// Other routes
+app.use("/sessions", require("./routes/sessionRoutes"));
+const secretWordRouter = require("./routes/secretWord");
+app.use("/secretWord", auth, secretWordRouter);
+
+// Error handling middleware
 app.use((req, res) => {
   res.status(404).send(`That page (${req.url}) was not found.`);
 });
@@ -69,11 +119,11 @@ app.use((err, req, res, next) => {
 });
 
 const port = process.env.PORT || 3000;
-
-const start = async () => {
+const start = () => {
   try {
-    app.listen(port, () =>
-      console.log(`Server is listening on port ${port}...`)
+    require("./db/connect")(mongoURL);
+    return app.listen(port, () =>
+      console.log(`Server is listening on port ${port}...`),
     );
   } catch (error) {
     console.log(error);
@@ -81,3 +131,5 @@ const start = async () => {
 };
 
 start();
+
+module.exports = { app };
