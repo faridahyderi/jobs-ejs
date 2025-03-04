@@ -3,6 +3,16 @@ const Job = require("./models/Job");
 require("express-async-errors");
 const app = express();
 
+//  Middleware to set Content-Type headers based on the route
+app.use((req, res, next) => {
+  if (req.path == "/multiply") {
+    res.set("Content-Type", "application/json");
+  } else {
+    res.set("Content-Type", "text/html");
+  }
+  next();
+});
+
 app.set("view engine", "ejs");
 app.use(require("body-parser").urlencoded({ extended: true }));
 
@@ -12,9 +22,13 @@ const MongoDBStore = require("connect-mongodb-session")(session);
 const csurf = require("csurf"); // CSRF protection
 const cookieParser = require("cookie-parser"); // Required for CSRF middleware
 
-const url = process.env.MONGO_URI;
+let mongoURL = process.env.MONGO_URI;
+if (process.env.NODE_ENV === "test") {
+  mongoURL = process.env.MONGO_URI_TEST;
+}
+
 const store = new MongoDBStore({
-  uri: url,
+  uri: mongoURL,
   collection: "mySessions",
 });
 store.on("error", function (error) {
@@ -47,7 +61,8 @@ app.use(require("connect-flash")());
 app.use(require("./middleware/storeLocals"));
 
 //  CSRF Protection Middleware (Must be after session and body-parser)
-app.use(csurf());
+app.use(csurf({ cookie: true }));
+
 
 //  Middleware to pass CSRF token to views
 app.use((req, res, next) => {
@@ -77,6 +92,17 @@ const auth = require("./middleware/auth");
 const jobRouter = require("./routes/jobs");  // Import job routes
 app.use("/jobs", auth, jobRouter);  // Add job routes to the app and ensure auth middleware is applied
 
+// Multiply API - Add before the 404 handler
+app.get("/multiply", (req, res) => {
+  let result = req.query.first * req.query.second;
+  if (isNaN(result)) {
+    result = "NaN";
+  } else if (result == null) {
+    result = "null";
+  }
+  res.json({ result: result });
+});
+
 // Other routes
 app.use("/sessions", require("./routes/sessionRoutes"));
 const secretWordRouter = require("./routes/secretWord");
@@ -93,12 +119,11 @@ app.use((err, req, res, next) => {
 });
 
 const port = process.env.PORT || 3000;
-
-const start = async () => {
+const start = () => {
   try {
-    await require("./db/connect")(process.env.MONGO_URI);
-    app.listen(port, () =>
-      console.log(`Server is listening on port ${port}...`)
+    require("./db/connect")(mongoURL);
+    return app.listen(port, () =>
+      console.log(`Server is listening on port ${port}...`),
     );
   } catch (error) {
     console.log(error);
@@ -106,3 +131,5 @@ const start = async () => {
 };
 
 start();
+
+module.exports = { app };

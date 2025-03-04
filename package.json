@@ -6,7 +6,8 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "NODE_ENV=test mocha tests/*.js --timeout 5000 --exit"
   },
   "author": "",
   "license": "ISC",
@@ -32,9 +33,15 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
+    "@faker-js/faker": "^9.5.1",
+    "chai": "^5.2.0",
+    "chai-http": "^5.1.1",
     "eslint": "^9.19.0",
+    "factory-bot": "^6.3.1",
     "globals": "^15.14.0",
+    "mocha": "^11.1.0",
     "nodemon": "^3.1.9",
-    "prettier": "^3.4.2"
+    "prettier": "^3.4.2",
+    "puppeteer": "^24.3.0"
   }
 }
